@@ -176,7 +176,7 @@ http://127.0.0.1:5000/api/classify-number?number=153
 import json
 
 def is_prime(n):
-    if n < 2:
+    if n < 2 or n % 1 != 0:  # Exclude negative and non-integer values
         return False
     for i in range(2, int(n ** 0.5) + 1):
         if n % i == 0:
@@ -184,16 +184,20 @@ def is_prime(n):
     return True
 
 def is_perfect(n):
-    return n == sum(i for i in range(1, n) if n % i == 0)
+    if n <= 0 or n % 1 != 0:  # Exclude zero and non-integers
+        return False
+    return n == sum(i for i in range(1, int(n)) if n % i == 0)
 
 def is_armstrong(n):
-    digits = [int(d) for d in str(n)]
+    if n % 1 != 0:  # Only consider integers
+        return False
+    digits = [int(d) for d in str(abs(int(n))) if d.isdigit()]
     power = len(digits)
     return n == sum(d**power for d in digits)
 
 def get_fun_fact(n):
     if is_armstrong(n):
-        return f"{n} is an Armstrong number because {' + '.join([f'{d}^{len(str(n))}' for d in str(n)])} = {n}"
+        return f"{n} is an Armstrong number because {' + '.join([f'{d}^{len(str(abs(int(n))))}' for d in str(abs(int(n))) if d.isdigit()])} = {n}"
     elif is_prime(n):
         return f"{n} is a prime number because it has only two divisors: 1 and itself."
     elif is_perfect(n):
@@ -206,29 +210,32 @@ def lambda_handler(event, context):
         query_params = event.get("queryStringParameters", {})
         num = query_params.get("number", "")
 
-        if not num.isdigit():
+        try:
+            num = float(num)  # Convert input to float
+        except ValueError:
             return {
                 "statusCode": 400,
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*"
                 },
-                "body": json.dumps({"number": num, "error": True})
+                "body": json.dumps({"number": num, "error": "Invalid number"})
             }
-
-        num = int(num)
 
         response = {
             "number": num,
             "is_prime": is_prime(num),
             "is_perfect": is_perfect(num),
-            "properties": ["odd" if num % 2 else "even"],
-            "digit_sum": sum(int(d) for d in str(num)),
+            "properties": [],
+            "digit_sum": sum(int(d) for d in str(abs(int(num))) if d.isdigit()) if num % 1 == 0 else None,
             "fun_fact": get_fun_fact(num)
         }
 
-        if is_armstrong(num):
-            response["properties"].append("armstrong")
+        # Assign correct properties
+        if num % 1 == 0:  # Only process whole numbers
+            response["properties"].append("odd" if int(num) % 2 else "even")
+            if is_armstrong(num):
+                response["properties"].append("armstrong")
 
         return {
             "statusCode": 200,
@@ -248,6 +255,7 @@ def lambda_handler(event, context):
             },
             "body": json.dumps({"error": str(e)})
         }
+
 
 ```
 
